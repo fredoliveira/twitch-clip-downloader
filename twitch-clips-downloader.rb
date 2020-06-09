@@ -21,37 +21,50 @@
 # with the limits of the twitch API (and tries not to blast your internet
 # connection). Anyways, enjoy the clips.
 
+# -------------------------------------------------------------------------
+# You can configure a few things here:
+# -------------------------------------------------------------------------
+
+# Your twitch developer app client ID
+CLIENT_ID = 'CHANGE-ME-PLEASE-MISTER-USER-SIR'
+
+# The channel you want to grab clips from
+CHANNEL = 'crokeyz'
+
+# For some reason, the twitch API stops giving us results after 12 pages
+MAX_PAGES = 12
+
+# If false, this script will only grab clip information to individual files
+DOWNLOAD = true
+
+# Endpoint for the clips. Only change if you know what you're doing.
+CLIP_URL = 'https://api.twitch.tv/kraken/clips/top'
+
+# The window of time to search for clips. Valid values: day, week, month, all
+PERIOD = 'all'
+
+# If true, the clips returned are ordered by popularity; otherwise, by viewcount
+TRENDING = 'false'
+
+# Order based on what's trending right now
+
+# -------------------------------------------------------------------------
+# Don't touch the code below unless you know what you are doing
+# -------------------------------------------------------------------------
+
 require 'rubygems'
 require 'faraday'
 require 'json'
 require 'pp'
 require 'fileutils'
 
-CLIENT_ID = 'CHANGE-ME-HERE-MISTER-USER-SIR'
-CLIP_URL = 'https://api.twitch.tv/kraken/clips/top'
-CHANNEL = 'crokeyz'
-MAX_PAGES = 12
-DOWNLOAD = true
-
-GAMES = {
-  "Gwent: The Witcher Card Game" => "gwent",
-  "Magic: The Gathering" => "mtg",
-  "The Witcher 3: Wild Hunt" => "witcher3",
-  "Artifact" => "artifact",
-  "World of Warcraft" => "wow",
-  "Slay the Spire" => "slaythespire",
-  "The Witness" => "witness",
-  "Two Point Hospital" => "twopointhospital",
-  "Cuphead" => "cuphead"
-}
-
 # Grab clip information from the Twitch API
 def grab_clips(cursor: nil)
   Faraday.get(CLIP_URL) do |req|
     req.params['cursor'] = cursor if cursor
     req.params['channel'] = CHANNEL
-    req.params['period'] = 'all'
-    req.params['trending'] = 'false'
+    req.params['period'] = PERIOD
+    req.params['trending'] = TRENDING
     req.params['limit'] = 100
 
     req.headers['Accept'] = 'application/vnd.twitchtv.v5+json'
@@ -80,11 +93,11 @@ end
 def parse_clip(clip)
   download_clip(
     clip['url'],
-    "downloads/#{GAMES["#{clip['game'].to_s.strip}"]}/#{clip['views']}-#{clip['curator']['display_name']}-#{clip['slug']}"
+    "downloads/#{slug(clip['game'].to_s.strip)}/#{clip['views']}-#{clip['curator']['display_name']}-#{clip['slug']}"
   ) if DOWNLOAD
 
-  FileUtils.mkdir_p "downloads/#{GAMES["#{clip['game'].to_s.strip}"]}"
-  File.write("downloads/#{GAMES["#{clip['game'].to_s.strip}"]}/#{clip['views']}-#{clip['curator']['display_name']}-#{clip['slug']}.json", clip.to_json)
+  FileUtils.mkdir_p "downloads/#{slug(clip['game'].to_s.strip)}"
+  File.write("downloads/#{slug(clip['game'].to_s.strip)}/#{clip['views']}-#{clip['curator']['display_name']}-#{clip['slug']}.json", clip.to_json)
 end
 
 # Downloads a given clip URL using youtube-dl
@@ -92,6 +105,11 @@ def download_clip(url, name)
   puts "Downloading #{url}"
   system "youtube-dl -q -o \"#{name}.%(ext)s\" #{url}"
   sleep(1)
+end
+
+# Handle the game name so that we can create folders with good names
+def slug(name)
+  name.downcase.gsub(/'/, '').gsub(/[^a-z0-9]+/, '-').chomp('')
 end
 
 # Do all the things
